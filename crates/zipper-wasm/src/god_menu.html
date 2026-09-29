@@ -1,0 +1,101 @@
+<li id="host-menu-extra-row">
+  <button type="button" class="host-menu-item" data-menu-action="god-tools">
+    <span class="host-menu-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" focusable="false">
+        <path d="M14.5 5.5l4 4" />
+        <path d="M16 4l4 4-8.5 8.5H7.5V12.5z" />
+        <path d="M5 19l3.5-1" />
+      </svg>
+    </span>
+    <span class="host-menu-item-label">God tools</span>
+  </button>
+</li>
+<ul id="host-menu-extra-panel" class="host-menu-list" hidden data-menu-title="God tools">
+  <li>
+    <button type="button" class="host-menu-item" data-menu-action="god-back">
+      <span class="host-menu-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false">
+          <path d="M14 6l-6 6 6 6" />
+        </svg>
+      </span>
+      <span class="host-menu-item-label">Back</span>
+    </button>
+  </li>
+  <li>
+    <label class="host-menu-item host-menu-switch" for="god-invuln-switch">
+      <span class="host-menu-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false">
+          <path d="M12 3.5l7 3v5.2c0 4.3-2.9 7.4-7 8.8-4.1-1.4-7-4.5-7-8.8V6.5z" />
+        </svg>
+      </span>
+      <span class="host-menu-switch-text">
+        <span class="host-menu-item-label">Invulnerability</span>
+      </span>
+      <input
+        type="checkbox"
+        id="god-invuln-switch"
+        class="host-menu-switch-input"
+        data-menu-action="god-invuln"
+      />
+      <span class="host-menu-switch-track" aria-hidden="true"></span>
+    </label>
+  </li>
+  <li>
+    <label class="host-menu-item host-menu-switch" for="god-key-switch">
+      <span class="host-menu-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false">
+          <circle cx="8.5" cy="10" r="3.5" />
+          <path d="M11.5 10h9v3h-2v3h-2v-3h-2" />
+        </svg>
+      </span>
+      <span class="host-menu-switch-text">
+        <span class="host-menu-item-label">Castle key</span>
+      </span>
+      <input
+        type="checkbox"
+        id="god-key-switch"
+        class="host-menu-switch-input"
+        data-menu-action="god-key"
+      />
+      <span class="host-menu-switch-track" aria-hidden="true"></span>
+    </label>
+  </li>
+  <li>
+    <div class="host-menu-item host-menu-teleport">
+      <span class="host-menu-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false">
+          <circle cx="12" cy="12" r="2" />
+          <path d="M12 3v4M12 17v4M3 12h4M17 12h4" />
+          <path d="M6.2 6.2l2.5 2.5M15.3 15.3l2.5 2.5M15.3 8.7l2.5-2.5M6.2 17.8l2.5-2.5" />
+        </svg>
+      </span>
+      <span class="host-menu-switch-text">
+        <span class="host-menu-item-label">Teleport</span>
+      </span>
+      <div class="host-menu-teleport-row">
+        <label class="host-menu-teleport-field" for="god-tele-x">
+          <span>x</span>
+          <input type="number" id="god-tele-x" inputmode="numeric" step="1" />
+        </label>
+        <label class="host-menu-teleport-field" for="god-tele-y">
+          <span>y</span>
+          <input type="number" id="god-tele-y" inputmode="numeric" step="1" />
+        </label>
+        <button type="button" class="host-menu-teleport-go" data-menu-action="god-teleport">
+          Go
+        </button>
+      </div>
+    </div>
+  </li>
+  <li>
+    <button type="button" class="host-menu-item" data-menu-action="god-force-win">
+      <span class="host-menu-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false">
+          <path d="M8 16V8l8 4z" />
+          <circle cx="12" cy="12" r="8.5" />
+        </svg>
+      </span>
+      <span class="host-menu-item-label">Force win</span>
+    </button>
+  </li>
+</ul>

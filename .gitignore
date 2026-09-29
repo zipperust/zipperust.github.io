@@ -1,0 +1,24 @@
+*.swp
+*.swo
+*~
+__pycache__/
+*.pyc
+
+# Rust build output
+/target/
+**/*.rs.bk
+
+# Compiled wasm + Pages staging — built from source by CI, never committed
+/pkg/
+/_site/
+/www/
+
+# Game data derived from the user's Zipper.pdx — never publish (BYOA purity)
+/ref/
+/assets/
+/crates/zipper-core/data/*.bin
+/crates/zipper-core/data/*.json
+
+# Local self-signed HTTPS certs
+/.certs/
+*.pem

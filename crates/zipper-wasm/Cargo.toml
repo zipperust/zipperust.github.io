@@ -1,0 +1,65 @@
+[package]
+name = "zipper-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+description = "Browser shell for Zipper (canvas, input, audio bridge)"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+# Dev God tools + `#god` fragment enable. Off in normal builds (`GOD=1` to opt in).
+god = []
+
+# wasm-pack runs wasm-opt after the Rust release build. Default is `-O`;
+# `-Oz` favors size. Custom args replace wasm-pack's defaults, so the feature
+# enables must be listed too (the LTO release build emits simd128 for memset,
+# plus the usual bulk-memory / sign-ext / nontrapping-fptoint ops).
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = [
+    "-Oz",
+    "--enable-simd",
+    "--enable-bulk-memory",
+    "--enable-nontrapping-float-to-int",
+    "--enable-sign-ext",
+    "--enable-mutable-globals",
+    "--enable-multivalue",
+    "--enable-reference-types",
+]
+
+[dependencies]
+zipper-core = { workspace = true }
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+console_error_panic_hook = "0.1"
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+    "console",
+    "Window",
+    "Document",
+    "Element",
+    "HtmlCanvasElement",
+    "CanvasRenderingContext2d",
+    "ImageData",
+    "CssStyleDeclaration",
+    "KeyboardEvent",
+    "Performance",
+    "AudioContext",
+    "AudioContextState",
+    "AudioBuffer",
+    "AudioBufferSourceNode",
+    "AudioScheduledSourceNode",
+    "AudioNode",
+    "AudioDestinationNode",
+    "AudioParam",
+    "GainNode",
+    "OscillatorNode",
+    "OscillatorType",
+    "BaseAudioContext",
+]

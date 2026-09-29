@@ -1,0 +1,1455 @@
+:root {
+  --bg: #2a2926;
+  --panel: #3a3834;
+  --lcd: #d7d4cd; /* paper RGB(215,212,205) — matches wasm blit */
+  --ink: #312f2a; /* ink RGB(49,47,42) — matches wasm blit */
+  --accent: #e8e4d9;
+  --btn: #4a4742;
+  --btn-active: #6a6660;
+  --muted: #9a968c;
+  font-family: "SF Mono", "Menlo", "Consolas", ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--accent);
+  /* Phone QoL: no text selection, no double-tap zoom / callout / loupe. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  -webkit-tap-highlight-color: transparent;
+  /* Allows pan/scroll; blocks double-tap zoom (stronger `none` is mobile-play only). */
+  touch-action: manipulation;
+}
+
+input,
+textarea {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+main {
+  /* Centered column: wide enough for integer scale up to 2× on desktop,
+     narrow enough to avoid a full-bleed stretch on big screens. */
+  max-width: min(100%, 60rem);
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+header {
+  margin-bottom: 0.85rem;
+}
+
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.stage {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: 1rem;
+  background: var(--panel);
+  border-radius: 0.5rem;
+  border: 1px solid #0006;
+}
+
+/* Desktop integer-zoom +/- ; fades out after idle (see main.js). */
+.stage-zoom {
+  position: absolute;
+  top: 0.55rem;
+  left: 0.55rem;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.15rem;
+  border-radius: 0.4rem;
+  background: rgba(20, 18, 16, 0.72);
+  border: 1px solid #0008;
+  box-shadow: 0 4px 12px #0006;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.stage-zoom.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.stage-zoom[hidden] {
+  display: none !important;
+}
+
+.stage-zoom-btn {
+  width: 1.65rem;
+  height: 1.65rem;
+  padding: 0;
+  border: 1px solid #0006;
+  border-radius: 0.3rem;
+  background: var(--btn);
+  color: var(--accent);
+  font: inherit;
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.stage-zoom-btn:hover:not(:disabled) {
+  background: var(--btn-active);
+}
+
+.stage-zoom-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.stage-zoom-label {
+  min-width: 2.1rem;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent);
+  user-select: none;
+}
+
+body.immersive .stage-zoom,
+body.mobile-play .stage-zoom {
+  display: none !important;
+}
+
+#screen {
+  /* Block: inline canvas sits on the text baseline and leaves a hairline gap.
+     Free-contain (integer scale off): fill the stage width. Integer mode
+     overrides with an inline DPR-snapped size. */
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 400 / 240;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  background: var(--lcd);
+  box-shadow: 0 0 0 2px var(--ink), 0 12px 32px #0008;
+  cursor: crosshair;
+  touch-action: none;
+  /* iOS: long-press / double-tap-hold loupe on the framebuffer. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Desktop: hide stage crosshair after idle (same 4s as zoom +/-; see main.js). */
+.stage.cursor-idle,
+.stage.cursor-idle #screen {
+  cursor: none;
+}
+
+/* Zoom chrome keeps its own pointer while the bar is visible. */
+.stage.cursor-idle .stage-zoom,
+.stage.cursor-idle .stage-zoom-btn {
+  cursor: pointer;
+}
+
+body.mobile-play #screen {
+  cursor: none;
+}
+
+/* F: hide chrome, scale the 400×240 screen to fill the viewport (letterboxed). */
+body.immersive {
+  overflow: hidden;
+  background: #000;
+}
+
+body.immersive main {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+}
+
+body.immersive main > :not(.stage) {
+  display: none;
+}
+
+body.immersive .stage {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: #000;
+  align-items: center;
+}
+
+body.immersive #screen {
+  /* Free contain of 5:3; JS may override with integer N×400×N×240 when pref on. */
+  width: min(100vw, calc(100dvh * 400 / 240));
+  height: min(100dvh, calc(100vw * 240 / 400));
+  max-width: none;
+  box-shadow: none;
+  /* Subpixel scale can leave a 1px strip of the element background; keep it black. */
+  background: #000;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Mobile play: fullscreen contain + translucent touch overlay                */
+/* -------------------------------------------------------------------------- */
+
+.touch-overlay {
+  display: none;
+}
+
+body.mobile-play {
+  /* visualViewport-driven box (set by syncMobileViewport in main.js).
+     Falls back to layout viewport when JS hasn't run yet. */
+  --vv-width: 100vw;
+  --vv-height: 100dvh;
+  --vv-offset-top: 0px;
+  --vv-offset-left: 0px;
+
+  overflow: hidden;
+  background: #000;
+  /* Avoid rubber-band scroll / pull-to-refresh while playing. */
+  overscroll-behavior: none;
+  touch-action: none;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+body.mobile-play main {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  position: fixed;
+  top: var(--vv-offset-top);
+  left: var(--vv-offset-left);
+  width: var(--vv-width);
+  height: var(--vv-height);
+}
+
+body.mobile-play main > :not(.stage) {
+  display: none;
+}
+
+body.mobile-play .stage {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: #000;
+  align-items: center;
+  justify-content: center;
+}
+
+body.mobile-play #screen {
+  /* Contain against the *visible* viewport (excludes Safari URL bar when possible). */
+  width: min(var(--vv-width), calc(var(--vv-height) * 400 / 240));
+  height: min(var(--vv-height), calc(var(--vv-width) * 240 / 400));
+  max-width: none;
+  box-shadow: none;
+  /* Same as immersive: don't flash the LCD grey as a hairline on black letterbox. */
+  background: #000;
+}
+
+body.mobile-play .touch-overlay {
+  display: block;
+  position: fixed;
+  top: var(--vv-offset-top);
+  left: var(--vv-offset-left);
+  width: var(--vv-width);
+  height: var(--vv-height);
+  z-index: 20;
+  pointer-events: none;
+  /* Safe areas (notch / home indicator). */
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+    env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  box-sizing: border-box;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+body.mobile-play .touch-overlay .touch-btn,
+body.mobile-play .touch-overlay .ios-chrome-tip,
+body.mobile-play .touch-overlay .touch-crank-strip {
+  pointer-events: auto;
+}
+
+/* Middle 25% width band — vertical swipe feeds Playdate crank degrees.
+   Height matches the contain-scaled LCD (#screen), vertically centered, so
+   portrait letterbox (D-pad / face buttons) stays clear of the crank hit target. */
+.touch-crank-strip {
+  display: none;
+  position: absolute;
+  left: 37.5%;
+  width: 25%;
+  /* Same contain math as body.mobile-play #screen. */
+  height: min(var(--vv-height), calc(var(--vv-width) * 240 / 400));
+  top: 50%;
+  transform: translateY(-50%);
+  /* Below menu (z) but above empty overlay; pads are siblings with their own hit boxes. */
+  z-index: 1;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  /* Invisible hit target; brief flash while dragging (see .dragging). */
+  background: transparent;
+}
+
+body.mobile-play .touch-crank-strip {
+  display: block;
+}
+
+.touch-crank-strip.dragging {
+  background: rgba(232, 228, 217, 0.06);
+}
+
+.touch-btn {
+  font: inherit;
+  color: rgba(232, 228, 217, 0.92);
+  background: rgba(40, 38, 34, 0.42);
+  border: 1.5px solid rgba(232, 228, 217, 0.38);
+  border-radius: 0.55rem;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  backdrop-filter: blur(2px);
+  box-shadow: 0 2px 10px #0006;
+}
+
+/* Inherit callout kill onto glyph text inside pads (▲ / A / B). */
+.touch-btn,
+.touch-btn * {
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+.touch-btn:active,
+.touch-btn.active {
+  background: rgba(100, 96, 88, 0.62);
+  border-color: rgba(232, 228, 217, 0.7);
+  transform: none;
+}
+
+.touch-dpad {
+  position: absolute;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 0.35rem;
+  width: min(42vw, 11.5rem);
+  height: min(42vw, 11.5rem);
+  left: max(0.75rem, env(safe-area-inset-left, 0px));
+  bottom: max(0.85rem, env(safe-area-inset-bottom, 0px));
+}
+
+.touch-dpad .touch-dir:nth-child(1) {
+  grid-column: 2;
+  grid-row: 1;
+}
+.touch-dpad .touch-dir:nth-child(2) {
+  grid-column: 1;
+  grid-row: 2;
+}
+.touch-dpad .touch-dir-center {
+  grid-column: 2;
+  grid-row: 2;
+  visibility: hidden;
+  pointer-events: none;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+.touch-dpad .touch-dir:nth-child(4) {
+  grid-column: 3;
+  grid-row: 2;
+}
+.touch-dpad .touch-dir:nth-child(5) {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+/* SW chest (145,176) sits under Down — drop blur only while that chest is in-room. */
+body.mobile-play.touch-down-clear .touch-dpad .touch-dir[data-btn="down"] {
+  backdrop-filter: none;
+}
+
+.touch-dir {
+  font-size: clamp(0.85rem, 3.2vw, 1.15rem);
+  font-weight: 600;
+}
+
+.touch-face {
+  position: absolute;
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-end;
+  right: max(0.75rem, env(safe-area-inset-right, 0px));
+  /* Portrait default: half a face-button above the safe-area floor.
+     Landscape overrides `bottom` entirely (see orientation media query). */
+  bottom: calc(
+    max(0.85rem, env(safe-area-inset-bottom, 0px)) + clamp(1.7rem, 7vw, 2.3rem)
+  );
+}
+
+.touch-round {
+  width: clamp(3.4rem, 14vw, 4.6rem);
+  height: clamp(3.4rem, 14vw, 4.6rem);
+  border-radius: 999px;
+  font-size: clamp(1rem, 4vw, 1.35rem);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.touch-a {
+  /* Classic SNES-ish offset: A sits slightly higher / further right. */
+  transform: translateY(-0.85rem);
+}
+
+.touch-a.active,
+.touch-a:active {
+  transform: translateY(-0.85rem);
+}
+
+.touch-menu {
+  position: absolute;
+  top: max(0.55rem, env(safe-area-inset-top, 0px));
+  left: max(0.55rem, env(safe-area-inset-left, 0px));
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  background: rgba(40, 38, 34, 0.35);
+}
+
+.ios-chrome-tip {
+  position: absolute;
+  left: 50%;
+  bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 30;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  align-items: stretch;
+  width: min(92%, 22rem);
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.65rem;
+  background: rgba(20, 18, 16, 0.88);
+  border: 1px solid rgba(232, 228, 217, 0.35);
+  color: rgba(232, 228, 217, 0.95);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 6px 24px #000a;
+}
+
+.ios-chrome-tip[hidden] {
+  display: none !important;
+}
+
+.ios-chrome-tip p {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.ios-chrome-tip-dismiss {
+  align-self: center;
+  min-width: 4rem;
+  min-height: 1.85rem;
+  padding: 0.2rem 0.85rem;
+  font-size: 0.72rem;
+  border-radius: 999px;
+}
+
+/* Crank-swipe tutorial — same panel family as ios-chrome-tip; host-level so Menu can reopen it. */
+.crank-swipe-tip {
+  position: fixed;
+  left: 50%;
+  bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 100;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  align-items: stretch;
+  width: min(92%, 22rem);
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.65rem;
+  background: rgba(20, 18, 16, 0.88);
+  border: 1px solid rgba(232, 228, 217, 0.35);
+  color: rgba(232, 228, 217, 0.95);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 6px 24px #000a;
+}
+
+.crank-swipe-tip[hidden] {
+  display: none !important;
+}
+
+.crank-swipe-tip p {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.crank-swipe-tip-dismiss {
+  align-self: center;
+  min-width: 4rem;
+  min-height: 1.85rem;
+  padding: 0.2rem 0.85rem;
+  font-size: 0.72rem;
+  border-radius: 999px;
+}
+
+/* ---- Landscape: pads in the side letterbox / pillarbox bands ---- */
+
+@media (orientation: landscape) {
+  body.mobile-play .touch-dpad {
+    /* Size against visible height so Safari URL bar doesn't squash the pad. */
+    width: min(calc(var(--vv-height) * 0.42), 10.5rem);
+    height: min(calc(var(--vv-height) * 0.42), 10.5rem);
+    left: max(0.35rem, env(safe-area-inset-left, 0px));
+    /* Center of the pad sits ~1/3 up from the bottom (thumbs rest lower). */
+    bottom: 33%;
+    transform: translateY(50%);
+  }
+
+  body.mobile-play .touch-face {
+    right: max(0.35rem, env(safe-area-inset-right, 0px));
+    bottom: 33%;
+    transform: translateY(50%);
+    /* Keep B | A side-by-side (same as portrait), not stacked. */
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 0.7rem;
+  }
+
+  /* A higher, B slightly lower — classic dual-thumb ergonomics. */
+  body.mobile-play .touch-a {
+    transform: translateY(-0.7rem);
+  }
+
+  body.mobile-play .touch-a.active,
+  body.mobile-play .touch-a:active {
+    transform: translateY(-0.7rem);
+  }
+
+  body.mobile-play .touch-round[data-btn="b"] {
+    transform: translateY(0.35rem);
+  }
+
+  body.mobile-play .touch-round[data-btn="b"].active,
+  body.mobile-play .touch-round[data-btn="b"]:active {
+    transform: translateY(0.35rem);
+  }
+
+  body.mobile-play .touch-round {
+    width: clamp(2.9rem, calc(var(--vv-height) * 0.16), 4rem);
+    height: clamp(2.9rem, calc(var(--vv-height) * 0.16), 4rem);
+  }
+
+  body.mobile-play .touch-menu {
+    left: max(0.35rem, env(safe-area-inset-left, 0px));
+    top: max(0.35rem, env(safe-area-inset-top, 0px));
+  }
+
+  body.mobile-play .ios-chrome-tip {
+    /* Keep tip clear of the side pads in landscape. */
+    bottom: max(0.45rem, env(safe-area-inset-bottom, 0px));
+    width: min(70%, 20rem);
+  }
+
+  body.mobile-play .crank-swipe-tip {
+    bottom: max(0.45rem, env(safe-area-inset-bottom, 0px));
+    width: min(70%, 20rem);
+  }
+}
+
+/* Narrow portrait phones: slightly larger hit targets. */
+@media (orientation: portrait) and (max-width: 430px) {
+  body.mobile-play .touch-dpad {
+    width: min(48vw, 12.5rem);
+    height: min(48vw, 12.5rem);
+  }
+
+  body.mobile-play .touch-round {
+    width: clamp(3.6rem, 16vw, 5rem);
+    height: clamp(3.6rem, 16vw, 5rem);
+  }
+
+  /* Match the larger face-button size: still half a button up. */
+  body.mobile-play .touch-face {
+    bottom: calc(
+      max(0.85rem, env(safe-area-inset-bottom, 0px)) + clamp(1.8rem, 8vw, 2.5rem)
+    );
+  }
+}
+
+.desktop-controls {
+  margin-top: 0.85rem;
+  padding: 0.55rem 0.75rem 0.75rem;
+  background: var(--panel);
+  border: 1px solid #0006;
+  border-radius: 0.5rem;
+  color: var(--accent);
+}
+
+.desktop-controls > summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  user-select: none;
+}
+
+.desktop-controls > summary::-webkit-details-marker {
+  display: none;
+}
+
+.desktop-controls > summary::before {
+  content: "▸";
+  display: inline-block;
+  width: 1rem;
+  color: var(--accent);
+}
+
+.desktop-controls[open] > summary {
+  margin-bottom: 0.75rem;
+  color: var(--accent);
+}
+
+.desktop-controls[open] > summary::before {
+  content: "▾";
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0;
+}
+
+.dpad {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.dpad .mid {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.ab {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+button {
+  font: inherit;
+  color: var(--accent);
+  background: var(--btn);
+  border: 1px solid #0008;
+  border-radius: 0.35rem;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+button:active,
+button.active {
+  background: var(--btn-active);
+  transform: translateY(1px);
+}
+
+button.round {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+}
+
+.crank {
+  margin-top: 1rem;
+}
+
+.crank label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+.crank input[type="range"] {
+  width: 100%;
+}
+
+.hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+kbd {
+  background: var(--btn);
+  border: 1px solid #0006;
+  border-radius: 0.2rem;
+  padding: 0 0.3rem;
+  font-size: 0.7rem;
+}
+
+.status {
+  margin: 0.65rem 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+  min-height: 0;
+}
+
+.status:empty {
+  display: none;
+}
+
+.status.error {
+  color: #e88;
+}
+
+/* ---- Host shell menu (burger) ---- */
+.host-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: max(1rem, env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px))
+    max(1rem, env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px));
+  box-sizing: border-box;
+}
+
+.host-menu[hidden] {
+  display: none !important;
+}
+
+.host-menu-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: #000a;
+  cursor: pointer;
+}
+
+.host-menu-panel {
+  position: relative;
+  z-index: 1;
+  width: min(20rem, 100%);
+  max-height: min(80vh, 32rem);
+  overflow: auto;
+  background: var(--panel, #1c1a17);
+  color: var(--accent, #e8e4d9);
+  border: 1px solid #0008;
+  border-radius: 0.75rem;
+  box-shadow: 0 12px 40px #000a;
+  padding: 0.7rem 0.75rem 0.85rem;
+}
+
+.host-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.host-menu-head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.host-menu-close {
+  min-width: 0;
+  min-height: 0;
+  padding: 0.25rem 0.45rem;
+}
+
+.host-menu-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+}
+
+/* Author `display: flex` beats the UA `[hidden]` rule at equal specificity. */
+.host-menu-list[hidden],
+#host-menu-extra-row[hidden],
+#host-menu-extra-slot[hidden] {
+  display: none !important;
+}
+
+.host-menu-item {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.55rem;
+  text-align: left;
+  min-height: 0;
+  padding: 0.42rem 0.6rem;
+  border-radius: 0.45rem;
+  background: rgba(40, 38, 34, 0.65);
+  border: 1px solid #0006;
+  box-sizing: border-box;
+}
+
+/* Compact stroke icons (inline SVG) beside labels. */
+.host-menu-icon {
+  flex: 0 0 auto;
+  width: 1.05rem;
+  height: 1.05rem;
+  display: grid;
+  place-items: center;
+  opacity: 0.88;
+  color: inherit;
+}
+
+.host-menu-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Filled brand mark (GitHub's octocat has no meaningful stroke outline). */
+.host-menu-icon-github svg {
+  fill: currentColor;
+  stroke: none;
+}
+
+.host-menu-item:active,
+.host-menu-item:hover {
+  background: rgba(80, 76, 68, 0.75);
+}
+
+/* D-pad / keyboard focus ring inside the host menu. */
+.host-menu-list > li.is-focused > .host-menu-item,
+.host-menu-list > li.is-focused > a.host-menu-item {
+  background: rgba(110, 104, 92, 0.9);
+  outline: 2px solid var(--accent, #e8e4d9);
+  outline-offset: -2px;
+}
+
+.host-menu-item:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+a.host-menu-link {
+  color: inherit;
+  text-decoration: none;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+a.host-menu-link:hover,
+a.host-menu-link:focus-visible {
+  background: rgba(80, 76, 68, 0.75);
+}
+
+.host-menu-item-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.host-menu-item-hint {
+  font-size: 0.75rem;
+  font-weight: 400;
+  opacity: 0.7;
+  line-height: 1.3;
+}
+
+.host-menu-switch {
+  justify-content: flex-start;
+  cursor: pointer;
+}
+
+.host-menu-switch .host-menu-switch-track {
+  margin-left: auto;
+}
+
+.host-menu-switch-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.host-menu-switch .host-menu-item-label {
+  flex: 0 1 auto;
+}
+
+.host-menu-switch-input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  pointer-events: none;
+}
+
+.host-menu-switch-track {
+  position: relative;
+  flex: 0 0 auto;
+  width: 2.6rem;
+  height: 1.45rem;
+  border-radius: 999px;
+  background: #0008;
+  border: 1px solid #0006;
+  transition: background 0.15s ease;
+}
+
+.host-menu-switch-track::after {
+  content: "";
+  position: absolute;
+  top: 0.12rem;
+  left: 0.12rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  background: var(--accent, #e8e4d9);
+  transition: transform 0.15s ease;
+}
+
+.host-menu-switch-input:checked + .host-menu-switch-track {
+  background: #4a6a3a;
+}
+
+.host-menu-switch-input:checked + .host-menu-switch-track::after {
+  transform: translateX(1.15rem);
+}
+
+.host-menu-switch-input:focus-visible + .host-menu-switch-track {
+  outline: 2px solid var(--accent, #e8e4d9);
+  outline-offset: 2px;
+}
+
+.host-menu-volume {
+  align-items: flex-start;
+  cursor: default;
+}
+
+.host-menu-volume-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.host-menu-volume .host-menu-item-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  flex: 0 0 auto;
+}
+
+.host-menu-volume-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: var(--muted, #9a9588);
+}
+
+.host-menu-volume-input {
+  width: 100%;
+  margin: 0;
+  accent-color: #4a6a3a;
+  cursor: pointer;
+}
+
+.host-menu-volume-input:focus-visible {
+  outline: 2px solid var(--accent, #e8e4d9);
+  outline-offset: 2px;
+}
+
+.host-menu-teleport {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.55rem;
+  cursor: default;
+}
+
+.host-menu-teleport .host-menu-teleport-row {
+  flex: 1 1 100%;
+}
+
+.host-menu-teleport:hover,
+.host-menu-teleport:active {
+  background: rgba(40, 38, 34, 0.65);
+}
+
+.host-menu-teleport-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.host-menu-teleport-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted, #9a958c);
+}
+
+.host-menu-teleport-field input {
+  width: 4.5rem;
+  padding: 6px 8px;
+  border: 1px solid #5a564c;
+  border-radius: 6px;
+  background: #2c2a26;
+  color: var(--accent, #e8e4d9);
+  font: inherit;
+  /* number spinners / autofill can force dark UA text otherwise */
+  color-scheme: dark;
+}
+
+.host-menu-teleport-field input:focus-visible {
+  outline: 2px solid var(--accent, #e8e4d9);
+  outline-offset: 1px;
+}
+
+.host-menu-teleport-go {
+  margin-left: auto;
+  padding: 6px 14px;
+  border: 1px solid #6a665c;
+  border-radius: 6px;
+  background: #4a463c;
+  color: var(--accent, #e8e4d9);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.host-menu-teleport-go:hover,
+.host-menu-teleport-go:active {
+  background: #5c584e;
+}
+
+.host-menu-status {
+  margin: 0.75rem 0 0;
+  font-size: 0.75rem;
+  color: var(--muted, #9a9588);
+  line-height: 1.4;
+}
+
+.host-menu-status.is-error {
+  color: #e88;
+}
+
+.host-menu-status.is-ok {
+  color: #8c8;
+}
+
+/* Sits in the header, next to the title; `margin-right: auto` keeps Close right. */
+.host-menu-version {
+  margin: 0 auto 0 0;
+  font-size: 0.7rem;
+  color: var(--muted, #9a968c);
+  letter-spacing: 0.04em;
+}
+
+body.mobile-play .host-menu {
+  /* Above the idle touch overlay (z-index 20). When the menu is open,
+     `body.host-menu-open` lifts the overlay to 100 so D-pad / A / B / ☰
+     stay tappable above the dimmer; empty overlay areas are still
+     `pointer-events: none`, so the panel + backdrop keep working. */
+  z-index: 90;
+}
+
+/* Mobile: keep on-screen pads usable while the host menu is open. */
+body.mobile-play.host-menu-open .touch-overlay {
+  z-index: 100;
+}
+
+body.mobile-play.host-menu-open .touch-crank-strip {
+  /* Don't steal taps / fight menu navigation. */
+  pointer-events: none !important;
+  visibility: hidden;
+}
+
+body.mobile-play.host-menu-open .touch-btn {
+  /* Sit clearly above the dimmed panel chrome. */
+  box-shadow: 0 2px 14px #000a;
+  background: rgba(40, 38, 34, 0.72);
+}
+
+.keybinds {
+  margin-top: 1rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+}
+
+.keybinds-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.keybinds-head h2 {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+button.textish {
+  min-width: 0;
+  min-height: 0;
+  padding: 0.25rem 0.55rem;
+  font-size: 0.7rem;
+  color: var(--muted);
+  background: transparent;
+  border-color: #0004;
+}
+
+button.textish:hover {
+  color: var(--accent);
+  background: var(--btn);
+}
+
+.keybind-list {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.45rem;
+}
+
+.keybind-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0.45rem;
+  background: #0002;
+  border-radius: 0.3rem;
+}
+
+.keybind-list .action {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.keybind-list .bind-btn {
+  min-width: 4.5rem;
+  min-height: 1.85rem;
+  padding: 0 0.45rem;
+  font-size: 0.72rem;
+}
+
+.keybind-list .bind-fixed {
+  min-width: 4.5rem;
+  min-height: 1.85rem;
+  padding: 0 0.45rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  color: var(--accent);
+  background: #0003;
+  border: 1px solid #0004;
+  border-radius: 0.3rem;
+  cursor: default;
+  user-select: none;
+}
+
+.keybind-list .bind-btn.listening {
+  background: #6a5040;
+  outline: 1px solid #e8a070;
+  color: #fff4e8;
+}
+
+.keybind-list .bind-btn.listening::after {
+  content: "…";
+}
+
+/* —— BYOA drop gate —— */
+.byoa-gate {
+  margin: 0.75rem 0 1rem;
+}
+
+.byoa-card {
+  background: var(--panel);
+  border: 1px solid #5a564e;
+  border-radius: 0.5rem;
+  padding: 1rem 1.1rem 1.15rem;
+}
+
+.byoa-card h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.byoa-card > p {
+  margin: 0 0 0.85rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.byoa-drop {
+  border: 1.5px dashed #7a7568;
+  border-radius: 0.45rem;
+  padding: 1.25rem 1rem;
+  text-align: center;
+  background: #0003;
+  cursor: pointer;
+  outline: none;
+}
+
+.byoa-drop.dragover,
+.byoa-drop:focus-visible {
+  border-color: #e8a070;
+  background: #6a504033;
+}
+
+.byoa-drop-title {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.byoa-drop-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.byoa-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.byoa-file-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.35rem;
+  border: 1px solid #6a6660;
+  background: var(--btn);
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.byoa-file-btn:hover {
+  background: var(--btn-active);
+}
+
+.byoa-error {
+  margin: 0.75rem 0 0;
+  color: #f0a090;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  line-height: 1.4;
+}
+
+.byoa-progress {
+  position: relative;
+  margin-top: 0.85rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: #0006;
+  overflow: hidden;
+}
+
+.byoa-progress-fill {
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.12s linear;
+}
+
+.byoa-progress.is-indeterminate .byoa-progress-fill {
+  width: 40% !important;
+  animation: byoa-progress-slide 1.1s ease-in-out infinite;
+}
+
+@keyframes byoa-progress-slide {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+.byoa-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.byoa-link:hover,
+.byoa-link:focus-visible {
+  color: var(--accent);
+}
+
+.byoa-link-icon {
+  display: grid;
+  place-items: center;
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.byoa-link-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+  stroke: none;
+}
+
+body.byoa-waiting .controls,
+body.byoa-waiting .crank,
+body.byoa-waiting .keybinds,
+body.byoa-waiting .desktop-controls {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+header .sub code {
+  font-size: 0.85em;
+}
+
+header .sub {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* —— BYOA gate overrides ——
+   On phones `.mobile-play` hides every `main` child except `.stage` (and the
+   touch HUD floats above). While we're waiting for the user's Zipper.pdx we
+   must show the gate and get the fixed full-screen canvas + touch pads out of
+   the way, otherwise there is no way to supply the assets. */
+body.byoa-waiting .stage {
+  display: none;
+}
+
+body.byoa-waiting .touch-overlay,
+body.byoa-waiting .crank-swipe-tip,
+body.byoa-waiting .ios-chrome-tip,
+body.byoa-waiting .stage-zoom {
+  display: none !important;
+}
+
+body.mobile-play.byoa-waiting main > :not(.stage) {
+  display: block;
+}
+
+/* Let the gate card scroll on phones: the mobile-play layout fixes `body` to
+   the viewport with overflow:hidden + touch-action:none (to kill rubber-band
+   while playing), which clips the picker buttons and blocks scrolling. */
+body.mobile-play.byoa-waiting {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  overscroll-behavior: auto;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+body.mobile-play.byoa-waiting main {
+  position: static;
+  width: auto;
+  height: auto;
+  min-height: 100dvh;
+  overflow: visible;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+/* Full-width tap targets on narrow screens. */
+@media (max-width: 480px) {
+  .byoa-actions .byoa-file-btn {
+    flex: 1 1 100%;
+  }
+}

@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no, interactive-widget=resizes-content"
+    />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="apple-mobile-web-app-title" content="Zipper-Rust" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+    <title>Zipper-Rust</title>
+    <!-- Cache-bust shell assets with the port stamp (scripts/build.sh bumps it). -->
+    <link rel="stylesheet" href="style.css?v=0.39o" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="header-top">
+          <h1>Zipper-Rust</h1>
+          <a
+            class="byoa-link"
+            href="https://github.com/zipperust/zipperust.github.io"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <span class="byoa-link-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
+              </svg>
+            </span>
+            Source on GitHub
+          </a>
+        </div>
+        <p class="sub">A Rust engine for Zipper</p>
+      </header>
+
+      <section id="byoa-gate" class="byoa-gate" hidden>
+        <div class="byoa-card">
+          <h2>Load Zipper.pdx</h2>
+          <p>
+            No game data is included; nothing is uploaded. Your files stay in this browser.
+          </p>
+          <div id="byoa-drop" class="byoa-drop" tabindex="0" role="button" aria-label="Drop Zipper.pdx zip or folder">
+            <p class="byoa-drop-title">Drop folder or .zip here</p>
+            <p class="byoa-drop-hint">or choose below</p>
+          </div>
+          <div class="byoa-actions">
+            <label class="byoa-file-btn">
+              Choose .zip
+              <input id="byoa-zip-input" type="file" accept=".zip,application/zip" hidden />
+            </label>
+            <label class="byoa-file-btn">
+              Choose folder
+              <input id="byoa-dir-input" type="file" webkitdirectory directory multiple hidden />
+            </label>
+            <button type="button" id="byoa-picker-btn" class="byoa-file-btn" hidden>Browse folder…</button>
+          </div>
+          <div id="byoa-progress" class="byoa-progress" hidden aria-hidden="true">
+            <div id="byoa-progress-fill" class="byoa-progress-fill"></div>
+          </div>
+          <p id="byoa-error" class="byoa-error" hidden></p>
+        </div>
+      </section>
+
+      <div class="stage">
+        <div
+          id="stage-zoom"
+          class="stage-zoom"
+          hidden
+          role="group"
+          aria-label="Display zoom"
+        >
+          <button type="button" id="stage-zoom-out" class="stage-zoom-btn" title="Zoom out">
+            −
+          </button>
+          <span id="stage-zoom-label" class="stage-zoom-label">6×</span>
+          <button type="button" id="stage-zoom-in" class="stage-zoom-btn" title="Zoom in">
+            +
+          </button>
+        </div>
+        <canvas id="screen" width="400" height="240" aria-label="Playdate screen"></canvas>
+      </div>
+
+      <p id="status" class="status">Loading…</p>
+
+      <!-- Desktop / tablet chrome (hidden in mobile-play / immersive). Closed by default. -->
+      <details class="desktop-controls">
+        <summary>Desktop controls</summary>
+
+        <section class="controls" aria-label="Controls">
+          <div class="dpad">
+            <button type="button" data-btn="up">↑</button>
+            <div class="mid">
+              <button type="button" data-btn="left">←</button>
+              <button type="button" data-btn="down">↓</button>
+              <button type="button" data-btn="right">→</button>
+            </div>
+          </div>
+          <div class="ab">
+            <button type="button" class="round" data-btn="b">B</button>
+            <button type="button" class="round" data-btn="a">A</button>
+          </div>
+          <div class="meta">
+            <button type="button" data-btn="menu">☰</button>
+            <button type="button" id="mobile-play-toggle" class="textish" title="Fullscreen touch layout">
+              Mobile
+            </button>
+          </div>
+        </section>
+
+        <section class="crank" aria-label="Crank">
+          <label for="crank">Crank <span id="crank-deg">0°</span></label>
+          <input id="crank" type="range" min="0" max="359" value="0" />
+          <p class="hint">
+            Wheel over screen · Shift+↑/↓ · Esc menu · F fullscreen
+          </p>
+        </section>
+
+        <section class="keybinds" aria-label="Keyboard bindings">
+          <div class="keybinds-head">
+            <h2>Keys</h2>
+            <button type="button" id="keybinds-reset" class="textish">Reset defaults</button>
+          </div>
+          <p class="hint">
+            Defaults: IJKL + X/Z (AZERTY: X/W). Click a row to remap.
+          </p>
+          <ul id="keybind-list" class="keybind-list"></ul>
+        </section>
+      </details>
+    </main>
+
+    <!--
+      Full-viewport touch HUD. Shown only in body.mobile-play.
+      pointer-events are enabled on the pads; the rest of the overlay is pass-through.
+    -->
+    <div id="touch-overlay" class="touch-overlay" aria-hidden="true">
+      <div class="touch-dpad" role="group" aria-label="D-pad">
+        <button type="button" class="touch-btn touch-dir" data-btn="up" aria-label="Up">▲</button>
+        <button type="button" class="touch-btn touch-dir" data-btn="left" aria-label="Left">◀</button>
+        <button type="button" class="touch-btn touch-dir touch-dir-center" tabindex="-1" aria-hidden="true" disabled></button>
+        <button type="button" class="touch-btn touch-dir" data-btn="right" aria-label="Right">▶</button>
+        <button type="button" class="touch-btn touch-dir" data-btn="down" aria-label="Down">▼</button>
+      </div>
+
+      <div class="touch-face" role="group" aria-label="Action buttons">
+        <button type="button" class="touch-btn touch-round" data-btn="b" aria-label="B">B</button>
+        <button type="button" class="touch-btn touch-round touch-a" data-btn="a" aria-label="A">A</button>
+      </div>
+
+      <button type="button" class="touch-btn touch-menu" data-btn="menu" aria-label="Menu">☰</button>
+
+      <!--
+        Center-band vertical swipe → crank (ghost preview). 25% of viewport width,
+        height = contain-scaled LCD (clears portrait letterbox / D-pad).
+        Transparent hit target under the letterboxed LCD.
+      -->
+      <div
+        id="touch-crank-strip"
+        class="touch-crank-strip"
+        role="slider"
+        aria-label="Crank"
+        aria-orientation="vertical"
+        aria-valuemin="0"
+        aria-valuemax="359"
+        aria-valuenow="0"
+      ></div>
+
+      <!--
+        iOS Safari keeps the URL bar in landscape (no Fullscreen API).
+        Standalone "Add to Home Screen" is the only reliable way to reclaim it.
+        Body/OK copy is filled from main.js (en/zh/hi/es/fr); English fallback here.
+      -->
+      <div id="ios-chrome-tip" class="ios-chrome-tip" hidden role="dialog" aria-modal="true" aria-labelledby="ios-chrome-tip-body">
+        <p id="ios-chrome-tip-body">
+          To hide the Safari bar: tap the <strong>aA</strong> icon (left of the URL) →
+          <strong>Hide Toolbar</strong>. Or: Share →
+          <strong>Add to Home Screen</strong> (permanent fullscreen).
+        </p>
+        <button type="button" id="ios-chrome-tip-dismiss" class="touch-btn ios-chrome-tip-dismiss">
+          OK
+        </button>
+      </div>
+
+    </div>
+
+    <!--
+      Center-strip vertical swipe → crank (ghost preview).
+      Auto-shown in mobile-play under crankhint gates; also via Menu → How to crank?
+      Body/OK copy from main.js (en/zh/hi/es/fr); English fallback here.
+      Host-level (not inside touch-overlay) so the menu can reopen it anywhere.
+    -->
+    <div
+      id="crank-swipe-tip"
+      class="crank-swipe-tip"
+      hidden
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="crank-swipe-tip-body"
+    >
+      <p id="crank-swipe-tip-body">
+        While aiming, swipe <strong>up or down</strong> in the
+        <strong>center</strong> of the screen to turn the crank and preview enemy moves.
+      </p>
+      <button type="button" id="crank-swipe-tip-dismiss" class="touch-btn crank-swipe-tip-dismiss">
+        OK
+      </button>
+    </div>
+
+    <!-- Host shell menu (burger). Expandable — gameplay never used Menu. -->
+    <div id="host-menu" class="host-menu" hidden>
+      <button type="button" class="host-menu-backdrop" data-menu-action="close" aria-label="Close menu"></button>
+      <div class="host-menu-panel" role="dialog" aria-modal="true" aria-labelledby="host-menu-title">
+        <header class="host-menu-head">
+          <h2 id="host-menu-title">Menu</h2>
+          <p id="host-menu-version" class="host-menu-version" aria-label="Port version"></p>
+          <button type="button" class="host-menu-close textish" data-menu-action="close">Close</button>
+        </header>
+        <ul id="host-menu-main" class="host-menu-list">
+          <li>
+            <label class="host-menu-item host-menu-volume" for="sfx-volume">
+              <span class="host-menu-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <path d="M4 10v4h3l4 3V7L7 10H4z" />
+                  <path d="M15 9.5a4 4 0 0 1 0 5" />
+                  <path d="M17.5 7a7 7 0 0 1 0 10" />
+                </svg>
+              </span>
+              <span class="host-menu-volume-body">
+                <span class="host-menu-item-label">
+                  Sound
+                  <span id="sfx-volume-value" class="host-menu-volume-value">60%</span>
+                </span>
+                <input
+                  type="range"
+                  id="sfx-volume"
+                  class="host-menu-volume-input"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value="60"
+                  data-menu-action="sfx-volume"
+                  aria-label="Sound volume"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  aria-valuenow="60"
+                />
+              </span>
+            </label>
+          </li>
+          <li>
+            <label class="host-menu-item host-menu-switch" for="mobile-layout-switch">
+              <span class="host-menu-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <rect x="8" y="3" width="8" height="18" rx="1.5" />
+                  <path d="M11 18.5h2" />
+                </svg>
+              </span>
+              <span class="host-menu-switch-text">
+                <span class="host-menu-item-label">Mobile layout</span>
+              </span>
+              <input
+                type="checkbox"
+                id="mobile-layout-switch"
+                class="host-menu-switch-input"
+                data-menu-action="mobile-layout"
+              />
+              <span class="host-menu-switch-track" aria-hidden="true"></span>
+            </label>
+          </li>
+          <li>
+            <label class="host-menu-item host-menu-switch" for="integer-scale-switch">
+              <span class="host-menu-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <rect x="3" y="3" width="7" height="7" />
+                  <rect x="14" y="3" width="7" height="7" />
+                  <rect x="3" y="14" width="7" height="7" />
+                  <rect x="14" y="14" width="7" height="7" />
+                </svg>
+              </span>
+              <span class="host-menu-switch-text">
+                <span class="host-menu-item-label">Integer scale</span>
+              </span>
+              <input
+                type="checkbox"
+                id="integer-scale-switch"
+                class="host-menu-switch-input"
+                checked
+              />
+              <span class="host-menu-switch-track" aria-hidden="true"></span>
+            </label>
+          </li>
+          <!-- Optional tools row: wasm `applyUrlFragment` may replace this slot. -->
+          <li id="host-menu-extra-slot" hidden aria-hidden="true"></li>
+          <li>
+            <button type="button" class="host-menu-item" data-menu-action="seppuku">
+              <span class="host-menu-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <path d="M4 18l10-10" />
+                  <path d="M12 6l2 2" />
+                  <path d="M15.5 8.5l3.5-1.5" />
+                </svg>
+              </span>
+              <span class="host-menu-item-label">Seppuku</span>
+            </button>
+          </li>
+          <li>
+            <button type="button" class="host-menu-item" data-menu-action="delete-save">
+              <span class="host-menu-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <path d="M4 7h16" />
+                  <path d="M9 7V5h6v2" />
+                  <path d="M7 7l1 12h8l1-12" />
+                </svg>
+              </span>
+              <span class="host-menu-item-label">Delete save</span>
+            </button>
+          </li>
+          <li>
+            <button type="button" class="host-menu-item" data-menu-action="reboot">
+              <span class="host-menu-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3" />
+                  <path d="M4.5 4.5v5h5" />
+                </svg>
+              </span>
+              <span class="host-menu-item-label">Reboot</span>
+            </button>
+          </li>
+          <li>
+            <button type="button" class="host-menu-item" data-menu-action="how-to-crank">
+              <span class="host-menu-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <circle cx="12" cy="12" r="3.5" />
+                  <path d="M12 3.5v2.5M12 18v2.5M3.5 12h2.5M18 12h2.5" />
+                  <path d="M6.2 6.2l1.8 1.8M16 16l1.8 1.8M16 8l1.8-1.8M6.2 17.8l1.8-1.8" />
+                </svg>
+              </span>
+              <span class="host-menu-item-label">How to crank</span>
+            </button>
+          </li>
+          <li id="host-menu-clear-assets-row" hidden>
+            <button type="button" class="host-menu-item" data-menu-action="clear-assets">
+              <span class="host-menu-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <path d="M4 7h16" />
+                  <path d="M9 7V5h6v2" />
+                  <path d="M7 7l1 12h8l1-12" />
+                </svg>
+              </span>
+              <span class="host-menu-item-label">Clear saved assets</span>
+            </button>
+          </li>
+          <li>
+            <a
+              class="host-menu-item host-menu-link"
+              href="https://play.date/games/zipper/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <span class="host-menu-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <rect x="4" y="5" width="16" height="14" rx="2" />
+                  <path d="M8 15h2M14 15h2" />
+                  <circle cx="12" cy="11" r="1.2" />
+                </svg>
+              </span>
+              <span class="host-menu-item-label">Playdate</span>
+            </a>
+          </li>
+          <li>
+            <a
+              class="host-menu-item host-menu-link"
+              href="https://www.foddy.net/blog/2026/02/zipper/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <span class="host-menu-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <path d="M5 19V6.5a1.5 1.5 0 0 1 1.5-1.5H19v12.5a1.5 1.5 0 0 1-1.5 1.5H5z" />
+                  <path d="M9 8.5h7M9 12h7M9 15.5h4" />
+                </svg>
+              </span>
+              <span class="host-menu-item-label">Foddy</span>
+            </a>
+          </li>
+          <li>
+            <a
+              class="host-menu-item host-menu-link"
+              href="https://github.com/zipperust/zipperust.github.io"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <span class="host-menu-icon host-menu-icon-github" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
+                </svg>
+              </span>
+              <span class="host-menu-item-label">GitHub</span>
+            </a>
+          </li>
+        </ul>
+        <!-- Optional tools panel: wasm `applyUrlFragment` may replace this slot. -->
+        <div id="host-menu-extra-panel-slot" hidden aria-hidden="true"></div>
+        <p id="host-menu-status" class="host-menu-status" hidden></p>
+      </div>
+    </div>
+
+    <script type="module" src="main.js?v=0.39o"></script>
+
+    <script>
+      // HTTPS (or localhost) required: Safari refuses SW on http://LAN-IP
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          if (!window.isSecureContext) {
+            console.warn('Service worker unavailable: insecure context (serve over HTTPS).');
+            return;
+          }
+          navigator.serviceWorker.register('./sw.js').then((reg) => {
+            console.info('Zipper-Rust SW ready', reg.scope, 'controller=', !!navigator.serviceWorker.controller);
+            if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+            reg.update().catch(() => {});
+            reg.addEventListener('updatefound', () => {
+              const sw = reg.installing;
+              if (!sw) return;
+              sw.addEventListener('statechange', () => {
+                if (sw.state === 'installed') {
+                  if (navigator.serviceWorker.controller) {
+                    sw.postMessage({ type: 'SKIP_WAITING' });
+                    console.info('Zipper-Rust SW updated (cache-first offline)');
+                  } else {
+                    console.info('Zipper-Rust SW installed (first offline cache)');
+                  }
+                }
+              });
+            });
+          }).catch((err) => {
+            console.warn('Service worker registration failed', err);
+          });
+
+          let refreshing = false;
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (refreshing) return;
+            refreshing = true;
+            window.location.reload();
+          });
+        });
+      }
+    </script>
+  </body>
+</html>

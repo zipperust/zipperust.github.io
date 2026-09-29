@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Local gate: never commit game data, and never commit untested engine changes.
+#
+# Install once per clone:  scripts/install-hooks.sh
+# Docs-only commits skip the tests automatically. Emergencies: git commit --no-verify
+set -euo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+staged="$(git diff --cached --name-only --diff-filter=ACMR)"
+
+# 1. Game data / build output must never be committed, even when force-added
+#    (`git add -f` bypasses .gitignore). Mirrors scripts/check-purity.sh.
+forbidden='^(ref/|assets/|pkg/|_site/)|^crates/zipper-core/data/.*\.(bin|json)$|\.pdx(\.zip)?$|\.pdz$'
+if printf '%s\n' "$staged" | grep -Eq "$forbidden"; then
+  echo "pre-commit: refusing to commit game data or build output:" >&2
+  printf '%s\n' "$staged" | grep -E "$forbidden" >&2
+  exit 1
+fi
+
+# Non-engine changes (README/dotfiles/etc.) don't need the game data.
+engine='^(crates/|lib/|scripts/|main\.js$|index\.html$|style\.css$|sw\.js$|Cargo\.(toml|lock)$|rust-toolchain\.toml$)'
+if ! printf '%s\n' "$staged" | grep -Eq "$engine"; then
+  exit 0
+fi
+
+if [[ "${SKIP_PRECOMMIT:-}" == "1" ]]; then
+  echo "pre-commit: SKIP_PRECOMMIT=1 — skipping tests"
+  exit 0
+fi
+
+# 2. The parity suite needs your own pdx-derived fixtures (gitignored, never shipped).
+missing=0
+for f in ref/Zipper.pdx/main.pdz \
+         crates/zipper-core/data/worldmap.bin \
+         crates/zipper-core/data/dialogs.json \
+         crates/zipper-core/data/introchord.json; do
+  if [[ ! -e "$f" ]]; then
+    echo "pre-commit: missing $f" >&2
+    missing=1
+  fi
+done
+if [[ "$missing" == "1" ]]; then
+  cat >&2 <<'EOF'
+pre-commit: run scripts/gen-fixtures.sh first (needs your ref/Zipper.pdx.zip).
+            bypass for emergencies only: git commit --no-verify
+EOF
+  exit 1
+fi
+
+# 3. Tests. Host target on purpose: a machine-wide CARGO_BUILD_TARGET=wasm32
+#    would otherwise hand `cargo test` a wasm binary the host cannot run.
+HOST_TRIPLE="$(rustc -vV | awk '/^host:/{print $2}')"
+echo "pre-commit: cargo test -p zipper-core (${HOST_TRIPLE})"
+( unset CARGO_BUILD_TARGET || true; cargo test -p zipper-core --target "$HOST_TRIPLE" )
+echo "pre-commit: cargo check -p zipper-wasm (wasm32-unknown-unknown)"
+cargo check -p zipper-wasm --target wasm32-unknown-unknown
+echo "pre-commit: node golden tests"
+for t in lib/dialogs_from_luac.test.mjs lib/worldmap_from_luac.test.mjs; do
+  out="$(node "$t")"
+  printf '%s\n' "$out"
+  # The scripts self-skip when their inputs are absent; after the fixture check
+  # above a skip means a path/layout bug, not "nothing to test".
+  if printf '%s\n' "$out" | grep -q '^skip:'; then
+    echo "pre-commit: $t skipped — fixtures not found on its search path" >&2
+    exit 1
+  fi
+done
+echo "pre-commit: OK"

@@ -1,0 +1,97 @@
+# Build the wasm engine from source and deploy the static shell to GitHub Pages.
+#
+# Nothing compiled is committed to the repository: the served wasm is produced
+# here from the public Rust source on every push.
+name: build-and-deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read      # checkout the source
+      pages: write        # publish the Pages artifact
+      id-token: write     # OIDC for Pages deploy
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install pinned Rust toolchain (matches rust-toolchain.toml)
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.98.1 \
+            --profile minimal \
+            --component rustfmt \
+            --target wasm32-unknown-unknown
+          rustup default 1.98.1
+          rustc -vV
+          rustup target list --installed
+
+      - name: Cache Rust build
+        # Caches ~/.cargo (registry/git/bin) + target/, keyed on Cargo.lock +
+        # toolchain. Also persists the installed wasm-pack, skipping the
+        # `cargo install` rebuild below on cache hits.
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: ${{ runner.os }}-wasm
+
+      - name: Install wasm-pack (pinned)
+        run: cargo install wasm-pack --version 0.13.1 --locked
+
+      - name: Build wasm from source
+        env:
+          SKIP_TESTS: "1"               # CI runners have no game fixtures (data is gitignored)
+          NO_BUMP: "1"                  # keep the committed PORT_VERSION
+          CACHE_TOKEN: ${{ github.sha }} # cache-bust shell assets with the commit
+        run: ./scripts/build.sh
+
+      - name: Verify BYOA purity (no game content in wasm)
+        # Fails if known game-content strings appear in the built wasm, or if
+        # any asset / golden-fixture path is tracked in git. See AGENTS.md.
+        run: ./scripts/check-purity.sh pkg/zipper_wasm_bg.wasm
+
+      - name: Stage static site
+        run: |
+          set -euo pipefail
+          rm -rf _site
+          mkdir -p _site
+          cp index.html main.js style.css sw.js manifest.webmanifest PORT_VERSION _site/
+          cp ./*.png _site/
+          cp -r lib _site/lib
+          cp -r pkg _site/pkg
+          echo "staged $(find _site -type f | wc -l) files"
+
+      - name: Configure Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+        with:
+          enablement: true    # create/enable the Pages site (build via Actions) on first run
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

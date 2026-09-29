@@ -1,0 +1,26 @@
+[workspace]
+resolver = "2"
+# Browser engine only. The SDL handheld host (`zipper-sdl`) and pd-convert
+# tooling are not part of this public, BYOA-pure tree.
+members = [
+    "crates/zipper-core",
+    "crates/zipper-wasm",
+]
+default-members = ["crates/zipper-core"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/zipperust/zipperust.github.io"
+publish = false
+
+[workspace.dependencies]
+zipper-core = { path = "crates/zipper-core" }
+
+# Size-tuned release: the wasm ships to browsers and is parsed on every load.
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true

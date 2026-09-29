@@ -1,0 +1,15 @@
+[package]
+name = "zipper-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Zipper game rules, levels, and AI (host-independent)"
+repository.workspace = true
+
+[dependencies]
+miniz_oxide = "0.8"
+
+[dev-dependencies]
+png = "0.17"
+serde_json = "1"

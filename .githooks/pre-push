@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Verify the full build + purity gate before pushing (which triggers CI).
+#
+# Install once per clone:  scripts/install-hooks.sh
+# Emergencies:             git push --no-verify
+set -euo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+if [[ "${SKIP_PREPUSH:-}" == "1" ]]; then
+  echo "pre-push: SKIP_PREPUSH=1 — skipping"
+  exit 0
+fi
+
+if [[ ! -e crates/zipper-core/data/worldmap.bin ]]; then
+  cat >&2 <<'EOF'
+pre-push: fixtures missing; run scripts/gen-fixtures.sh first.
+         bypass for emergencies only: git push --no-verify
+EOF
+  exit 1
+fi
+
+echo "pre-push: full build (parity tests + wasm + purity), no version stamp"
+NO_BUMP=1 NO_STAMP=1 ./scripts/build.sh
+echo "pre-push: OK"
